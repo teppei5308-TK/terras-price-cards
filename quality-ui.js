@@ -19,12 +19,18 @@
     const title=node('h3',record.mode==='advice'?'写真からのアドバイス':'過去の写真チェック');host.append(title);
     host.append(node('p',record.kind+' / '+(record.proposer||'提案者未入力')+' / '+new Date(record.at).toLocaleString('ja-JP'),'field-help'));
     if(record.mode==='advice'){
-      const advice=Q.photoAdvice(record.check,record.views),cards=node('div',undefined,'photo-advice-grid');
-      for(const [heading,items,empty] of [['良いところ',advice.good,record.views.length?'写真では確認しきれませんでした。':'写真はまだありません。'],['直すとよいところ',advice.improve,record.views.length?'写真で見える範囲では、大きな修正点は確認できませんでした。':'写真を追加するとアドバイスできます。']]){
-        const card=node('section',undefined,'photo-advice-card');card.append(node('h4',heading));
-        if(items.length){const list=node('ul');items.forEach(item=>list.append(node('li',item)));card.append(list);}else card.append(node('p',empty,'field-help'));cards.append(card);
+      // 先に「次に試すこと」、続いて原則名つきの良いところ／直すとよいところ、最後に写真では見られない点
+      const advice=Q.adviceItems(record.check,record.views,record.criteria);
+      // 直す点があれば一番上の項目に「まずこれ」を付ける。無いときだけ「次に試すこと」を出す
+      if(!advice.improve.length){const next=node('section',undefined,'photo-advice-next');next.append(node('h4','次に試すこと'),node('p',advice.next));host.append(next);}
+      const cards=node('div',undefined,'photo-advice-grid');
+      for(const [heading,items,empty,kind] of [['良いところ',advice.good,record.views.length?'写真では確認しきれませんでした。':'写真はまだありません。','good'],['直すとよいところ',advice.improve,record.views.length?'写真で見える範囲では、大きな修正点は見つかりませんでした。':'写真を追加するとアドバイスできます。','improve']]){
+        const card=node('section',undefined,'photo-advice-card '+kind);card.append(node('h4',heading+(items.length?'（'+items.length+'）':'')));
+        if(items.length){const list=node('ul');items.forEach((item,i)=>{const li=node('li');const head=node('strong',item.title);if(item.mark)head.append(node('span',i===0?'まずこれ':item.mark==='×'?'要修正':'もう一歩','advice-badge'+(item.mark==='×'||i===0?' strong':'')));li.append(head);if(item.reason)li.append(node('small',item.reason,'advice-reason'));li.append(node('span',(item.mark?'→ ':'')+item.text,'advice-text'));list.append(li);});card.append(list);}
+        else card.append(node('p',empty,'field-help'));cards.append(card);
       }
-      host.append(cards);const next=node('section',undefined,'photo-advice-next');next.append(node('h4','次に試すこと'),node('p',advice.next));host.append(next);
+      host.append(cards);
+      if(advice.check.length){const box=node('div',undefined,'advice-check');box.append(node('span','実物で確認：','advice-check-label'));advice.check.forEach(t=>box.append(node('span',t,'advice-chip')));host.append(box);}
     }else{
     const staff=record.answers.includes(false),unknown=record.check.principles.filter(x=>x.mark==='写真では判定できない').length;
     host.append(node('p',record.check.overall,'quality-overall '+(record.check.overall==='直してから'?'needs-fix':'')));
@@ -70,12 +76,12 @@
     const reply=node('div',undefined,'quality-reply');reply.append(node('h4','社長の返事を記録'));
     const decisionLabel=node('label','返事'),decision=node('select');decision.setAttribute('aria-label','社長の返事');
     for(const [value,label] of [['pending','返事待ち'],['OK','OK'],['直して','直して'],['NG','NG']])decision.add(new Option(label,value));decision.value=record.decision;decisionLabel.append(decision);
-    const choiceLabel=node('label','選んだ名前'),choice=node('select');choiceLabel.hidden=!record.candidates.length;choice.setAttribute('aria-label','社長が選んだ名前');choice.add(new Option('未選択',''));record.candidates.forEach((c,i)=>choice.add(new Option('ABC'[i]+' '+c.name,String(i))));choice.value=record.chosen===null?'':String(record.chosen);choiceLabel.append(choice);
-    const noteLabel=node('label','返事・修正メモ'),note=node('textarea');note.rows=2;note.maxLength=500;note.value=record.note;noteLabel.append(note);
+    const choiceLabel=node('label','使う名前（任意）'),choice=node('select');choiceLabel.hidden=!record.candidates.length;choice.setAttribute('aria-label','社長が選んだ名前');choice.add(new Option('未選択',''));record.candidates.forEach((c,i)=>choice.add(new Option('ABC'[i]+' '+c.name,String(i))));choice.value=record.chosen===null?'':String(record.chosen);choiceLabel.append(choice);
+    const noteLabel=node('label','社長のコメント・直す点'),note=node('textarea');note.rows=2;note.maxLength=500;note.value=record.note;noteLabel.append(note);
     const save=node('button','相談結果・返事を保存');save.type='button';const saved=node('p');saved.setAttribute('role','status');
     const load=node('button','LINEの返事を読み込む');load.type='button';
-    load.onclick=async()=>{load.disabled=true;saved.textContent='読み込んでいます…';try{const data=await L.status([record.id]),item=data.items[record.id];if(!item){saved.textContent='まだLINEグループに投稿されていません。';return;}const r=L.reply(item,record.candidates.length);if(!r){saved.textContent='社長の返事はまだありません。';return;}decision.value=r.decision;choice.value=r.chosen===null?'':String(r.chosen);save.onclick();saved.textContent='LINEの返事（'+r.decision+(r.chosen===null?'':'・'+'ABC'[r.chosen]+'案')+(r.by?'・'+r.by:'')+'）を記録しました。';}catch(e){saved.textContent=e.message;}finally{load.disabled=false;}};
-    save.onclick=()=>{try{const next={...latest(),decision:decision.value,chosen:choice.value===''?null:Number(choice.value),note:note.value};if(next.candidates.length&&next.decision==='OK'&&next.chosen===null)throw new Error('OKの場合は名前A/B/Cも選んでください。');const exists=S.read().reviews.some(r=>r.id===next.id);if(exists)S.updateReview(next);else S.addReview(next);Object.assign(record,next);saved.textContent='この端末の履歴に保存しました。';message();}catch(e){saved.textContent=e.message;}};
+    load.onclick=async()=>{load.disabled=true;saved.textContent='読み込んでいます…';try{const data=await L.status([record.id]),item=data.items[record.id];if(!item){saved.textContent='まだLINEグループに投稿されていません。';return;}const r=L.reply(item,record.candidates.length);if(!r){saved.textContent='社長の返事はまだありません。';return;}decision.value=r.decision;choice.value=r.chosen===null?'':String(r.chosen);if(r.comment)note.value=r.comment;save.onclick();saved.textContent='LINEの返事（'+r.decision+(r.by?'・'+r.by:'')+'）'+(r.comment?'とコメント':'')+'を記録しました。';}catch(e){saved.textContent=e.message;}finally{load.disabled=false;}};
+    save.onclick=()=>{try{const next={...latest(),decision:decision.value,chosen:choice.value===''?null:Number(choice.value),note:note.value};const exists=S.read().reviews.some(r=>r.id===next.id);if(exists)S.updateReview(next);else S.addReview(next);Object.assign(record,next);saved.textContent='この端末の履歴に保存しました。';message();}catch(e){saved.textContent=e.message;}};
     reply.append(load,decisionLabel,choiceLabel,noteLabel,save,saved);host.append(reply);
   }
   function renderHistory(){
@@ -122,9 +128,9 @@
   // 返事待ちの相談に、LINEで社長が押した返事を取り込む（失敗しても画面はそのまま）
   async function syncReplies(){
     try{
-      const pending=read().reviews.filter(r=>r.decision==='pending').slice(0,50);if(!pending.length)return;
+      const pending=read().reviews.filter(r=>r.decision==='pending'||!r.note).slice(0,50);if(!pending.length)return;
       const data=await L.status(pending.map(r=>r.id));
-      for(const r of pending){const got=L.reply(data.items[r.id],r.candidates.length);if(got)S.updateReview({...r,decision:got.decision,chosen:got.chosen});}
+      for(const r of pending){const got=L.reply(data.items[r.id],r.candidates.length);if(got)S.updateReview({...r,decision:got.decision,chosen:got.chosen,note:got.comment||r.note});}
     }catch{/* 通信できないときは、次に開いたときに読み込む */}
   }
   reset();renderHistory();reference();renderBasicHistory();total();syncReplies();

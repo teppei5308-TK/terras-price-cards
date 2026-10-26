@@ -16,12 +16,11 @@
     if(!/^P\d{11}$/.test(String(receipt)))throw new Error('受付番号を受け取れませんでした。もう一度押してください。');
     return 'https://line.me/R/share?text='+encodeURIComponent('【新商品相談】'+review.kind+'\n#'+receipt);
   }
-  // GT-botの返事を、相談履歴の decision / chosen の形にそろえる。知らない値は無視する
+  // GT-botの返事を、相談履歴の decision / chosen / note の形にそろえる。知らない値は無視する。社長の返事は内容へのコメントが主で、名前の選択は任意
   function reply(item,candidateCount){
     if(!item||!DECISIONS.includes(item.decision))return null;
     const chosen=Number.isInteger(item.chosen)&&item.chosen>=0&&item.chosen<candidateCount?item.chosen:null;
-    if(item.decision==='OK'&&candidateCount&&chosen===null)return null;
-    return {decision:item.decision,chosen:item.decision==='OK'?chosen:null,by:typeof item.by==='string'?item.by.slice(0,40):''};
+    return {decision:item.decision,chosen:item.decision==='OK'?chosen:null,by:typeof item.by==='string'?item.by.slice(0,40):'',comment:typeof item.comment==='string'?item.comment.slice(0,500):''};
   }
   async function call(init,query=''){
     let response;

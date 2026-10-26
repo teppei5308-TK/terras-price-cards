@@ -82,16 +82,34 @@
   function shareText(record){
     const r=review(record),flags=r.check.principles.filter(x=>['×','△'].includes(x.mark)).map(x=>r.criteria.principles[x.no-1].title),unknown=r.check.principles.filter(x=>x.mark==='写真では判定できない').length;
     if(r.mode==='advice'){
-      const a=photoAdvice(r.check,r.views);
-      return ['【新商品相談】'+r.kind,'提案：'+(r.proposer||'未入力'),'写真からのアドバイス（参考）',...(a.good.length?['良いところ',...a.good.map(x=>'・'+x)]:[]),...(a.improve.length?['直すとよいところ',...a.improve.map(x=>'・'+x)]:[]),'次に試すこと：'+a.next,...(r.candidates.length?['名前案',...r.candidates.map((c,i)=>'ABC'[i]+' '+c.name)]:[]),'社長へ：OK／直して／NG'+(r.candidates.length?' と、名前A/B/C':'')+'で返信してください','写真から材料・味・アレルゲンは判断していません。'].join('\n');
+      // スマホのLINEで読みやすいよう、■見出し＋空行で区切る
+      const a=adviceItems(r.check,r.views,r.criteria),block=(head,lines)=>lines.length?['',head,...lines]:[];
+      return ['【新商品相談】'+r.kind,'提案：'+(r.proposer||'未入力'),
+        ...block('■ 良いところ',a.good.map(x=>'・'+x.title+'：'+x.text)),
+        ...block('■ 直すとよいところ',a.improve.flatMap((x,i)=>['・'+x.title+(i===0?'（まずこれ）':''),'　'+x.reason,'　→ '+x.text])),
+        ...block('■ 次に試すこと',a.improve.length?[]:[a.next]),
+        ...block('■ 実物で確認',a.check.length?[a.check.join('／')]:[]),
+        ...block('■ 名前案（参考）',r.candidates.map((c,i)=>'ABC'[i]+' '+c.name)),
+        '','社長へ：OK／直して／NG と、気になる点をひと言ください','※写真のアドバイスは参考。材料・味・アレルゲンは写真から判断していません。'].join('\n');
     }
     return ['【新商品審査】'+r.kind,'提案：'+(r.proposer||'未入力'),r.answers.length+'問チェック '+r.answers.filter(x=>x===true).length+'/'+r.answers.length+(r.answers.length!==QUESTION_COUNT?'（旧基準）':'')+(r.answers.includes(null)?'（未回答あり）':''),'写真チェック '+r.check.overall+(flags.length?'（'+flags.join('・')+'）':'')+(unknown?'／未判定'+unknown+'項目':''),'名前案',...r.candidates.map((c,i)=>'ABC'[i]+' '+c.name),'社長へ：OK／直して／NG と、名前A/B/Cで返信してください','写真チェックは参考です。最終判断は社長。'].join('\n');
+  }
+  // 画面とLINE用：原則名つきで「良いところ／直すとよいところ／実物で確認」に分ける
+  function adviceItems(check,views,crit){
+    const title=no=>(crit&&crit.principles&&crit.principles[no-1]&&crit.principles[no-1].title)||('原則'+no);
+    if(!views.length)return {good:[],improve:[],check:[],next:'写真を追加すると、見た目のアドバイスを作れます。'};
+    const ps=check.principles,visible=ps.filter(p=>p.mark!=='写真では判定できない');
+    const issues=visible.filter(p=>['×','△'].includes(p.mark)).sort((a,b)=>(a.mark==='×'?0:1)-(b.mark==='×'?0:1));
+    return {good:visible.filter(p=>p.mark==='○').slice(0,4).map(p=>({no:p.no,title:title(p.no),text:p.reason})),
+      improve:issues.slice(0,3).map(p=>({no:p.no,title:title(p.no),text:p.fix,reason:p.reason,mark:p.mark})),
+      check:ps.filter(p=>p.mark==='写真では判定できない').map(p=>title(p.no)),
+      next:issues[0]?.fix||'実物の焼き色・断面・形も見ながら、仕上がりを確かめてみてください。'};
   }
   function photoAdvice(check,views){
     if(!views.length)return {good:[],improve:[],next:'写真を追加すると、見た目のアドバイスを作れます。'};
     const visible=check.principles.filter(p=>p.mark!=='写真では判定できない'),good=visible.filter(p=>p.mark==='○').map(p=>p.reason).slice(0,3),issues=visible.filter(p=>['×','△'].includes(p.mark)).sort((a,b)=>(a.mark==='×'?0:1)-(b.mark==='×'?0:1));
     return {good:[...new Set(good)],improve:[...new Set(issues.map(p=>p.fix))].slice(0,3),next:issues[0]?.fix||'実物の焼き色・断面・形も見ながら、仕上がりを確かめてみてください。'};
   }
-  const api={KEY,MAX_HISTORY,QUESTION_COUNT,VIEWS,PHOTO_VIEWS,VIEW_NAMES,BASICS,DEFAULTS,clone,criteria,answers,qualityInput,assessment,photoAdvice,blank,review,basic,state,merge,shareText};
+  const api={KEY,MAX_HISTORY,QUESTION_COUNT,VIEWS,PHOTO_VIEWS,VIEW_NAMES,BASICS,DEFAULTS,clone,criteria,answers,qualityInput,assessment,photoAdvice,adviceItems,blank,review,basic,state,merge,shareText};
   root.TerrasQualityData=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
