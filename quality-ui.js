@@ -8,16 +8,19 @@
   function renderQuestions(){
     $('quality-questions').replaceChildren();$('quality-self-summary').textContent='';
   }
+  // 売価・原価：全角数字やカンマ・「円」を取り除いて円の整数にそろえる
+  function money(id,label){const v=$(id).value.trim().replace(/[,，円\s]/g,'').replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0));if(v!==''&&!/^\d{1,7}$/.test(v))throw new Error(label+'は円の整数で入力してください（例：380）。');return v;}
   function context(views){
     const value=Q.qualityInput({mode:'advice',criteria:read().criteria},views);
     const proposer=$('quality-proposer').value.trim();if(proposer.length>80)throw new Error('提案者名は80文字以内です。');
-    return {...value,proposer};
+    return {...value,proposer,price:money('pc-price','売価'),cost:money('pc-cost','原価')};
   }
   function photoFiles(photos){return photos.map(({view,data})=>{const binary=atob(data.split(',')[1]),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));return new File([bytes],'TERRAS-'+view+'.jpg',{type:'image/jpeg'});});}
   function drawRecord(record,host,photos,live=false){
     host.replaceChildren();
     const title=node('h3',record.mode==='advice'?'写真からのアドバイス':'過去の写真チェック');host.append(title);
     host.append(node('p',record.kind+' / '+(record.proposer||'提案者未入力')+' / '+new Date(record.at).toLocaleString('ja-JP'),'field-help'));
+    if(Q.costLine(record))host.append(node('p',Q.costLine(record),'advice-cost'));
     if(record.mode==='advice'){
       // 先に「次に試すこと」、続いて原則名つきの良いところ／直すとよいところ、最後に写真では見られない点
       const advice=Q.adviceItems(record.check,record.views,record.criteria);
@@ -90,7 +93,7 @@
     for(const r of s.reviews){const row=node('article',undefined,'quality-history-row');row.append(node('strong',r.kind),node('p',new Date(r.at).toLocaleString('ja-JP')+' · '+(r.mode==='advice'?'写真からの相談':r.check.overall)+' · '+(r.decision==='pending'?'返事待ち':r.decision)+(r.chosen===null?'':' / 名前'+'ABC'[r.chosen]),'field-help'));const button=node('button','結果・社長の返事を開く');button.type='button';button.onclick=()=>{drawRecord(Q.clone(r),$('quality-history-record'),[]);$('quality-history-dialog').showModal();$('quality-history-dialog').scrollTop=0;};row.append(button);host.append(row);}
   }
   function showResult({candidates,check,input,context:ctx,photos}){
-    current={id:crypto.randomUUID(),at:new Date().toISOString(),kind:input.kind||'写真からの相談',proposer:ctx.proposer,mode:'advice',answers:[],criteria:ctx.criteria,views:photos.map(x=>x.view),check,candidates:Q.clone(candidates),decision:'pending',chosen:null,note:''};currentPhotos=photos.slice();
+    current={id:crypto.randomUUID(),at:new Date().toISOString(),kind:input.kind||'写真からの相談',proposer:ctx.proposer,price:ctx.price,cost:ctx.cost,mode:'advice',answers:[],criteria:ctx.criteria,views:photos.map(x=>x.view),check,candidates:Q.clone(candidates),decision:'pending',chosen:null,note:''};currentPhotos=photos.slice();
     drawRecord(current,$('quality-result'),currentPhotos,true);
     notify('quality-storage-status',()=>{S.addReview(current);$('quality-storage-status').textContent='アドバイスを保存しました（写真は含みません）。';});
   }
@@ -133,5 +136,8 @@
       for(const r of pending){const got=L.reply(data.items[r.id],r.candidates.length);if(got)S.updateReview({...r,decision:got.decision,chosen:got.chosen,note:got.comment||r.note});}
     }catch{/* 通信できないときは、次に開いたときに読み込む */}
   }
+  function costRate(){let r='';try{r=Q.costLine({price:money('pc-price','売価'),cost:money('pc-cost','原価')});}catch(e){r=e.message;}$('pc-cost-rate').textContent=r;}
+  ['pc-price','pc-cost'].forEach(id=>$(id).addEventListener('input',costRate));
+  window.TerrasQualityUI.costRate=costRate;
   reset();renderHistory();reference();renderBasicHistory();total();syncReplies();
 })();

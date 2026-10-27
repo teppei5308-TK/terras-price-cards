@@ -57,7 +57,9 @@
     const advisory=raw.mode==='advice';if(Object.hasOwn(raw,'mode')&&!advisory)throw new Error('相談記録の形式が異なります。');
     if(!Array.isArray(raw.candidates)||!(raw.candidates.length===3||(advisory&&raw.candidates.length===0))||!['pending','OK','直して','NG'].includes(raw.decision)||!(raw.chosen===null||[0,1,2].includes(raw.chosen))||(raw.chosen!==null&&!raw.candidates[raw.chosen]))throw new Error('社長への提案記録が不正です。');
     const at=text(raw.at,40,true);if(!Number.isFinite(Date.parse(at)))throw new Error('記録の日付が不正です。');
-    return {id:text(raw.id,100,true),at,kind:text(raw.kind,80,true),proposer:text(raw.proposer,80),...(advisory?{mode:'advice'}:{}),answers:a,criteria:c,views:views.slice(),check:assessment(raw.check,views,a,advisory),candidates:raw.candidates.map(G.candidate),decision:raw.decision,chosen:raw.chosen,note:text(raw.note,500)};
+    const money=k=>{const v=raw[k]===undefined?'':String(raw[k]).trim();if(v!==''&&!/^\d{1,7}$/.test(v))throw new Error((k==='price'?'売価':'原価')+'は円の整数で入力してください。');return v;};
+    const price=money('price'),cost=money('cost');
+    return {id:text(raw.id,100,true),at,kind:text(raw.kind,80,true),proposer:text(raw.proposer,80),...(price?{price}:{}),...(cost?{cost}:{}),...(advisory?{mode:'advice'}:{}),answers:a,criteria:c,views:views.slice(),check:assessment(raw.check,views,a,advisory),candidates:raw.candidates.map(G.candidate),decision:raw.decision,chosen:raw.chosen,note:text(raw.note,500)};
   }
   function basic(raw){
     if(!object(raw)||!Object.hasOwn(BASICS,raw.product)||!Array.isArray(raw.scores)||raw.scores.length!==5||raw.scores.some(x=>![1,2,3].includes(x)))throw new Error('ベーシックの5項目を1〜3点で採点してください。');
@@ -84,7 +86,7 @@
     if(r.mode==='advice'){
       // スマホのLINEで読みやすいよう、■見出し＋空行で区切る
       const a=adviceItems(r.check,r.views,r.criteria),block=(head,lines)=>lines.length?['',head,...lines]:[];
-      return ['【新商品相談】'+r.kind,'提案：'+(r.proposer||'未入力'),
+      return ['【新商品相談】'+r.kind,'提案：'+(r.proposer||'未入力'),...(costLine(r)?[costLine(r)]:[]),
         ...block('■ 良いところ',a.good.map(x=>'・'+x.title+'：'+x.text)),
         ...block('■ 直すとよいところ',a.improve.flatMap((x,i)=>['・'+x.title+(i===0?'（まずこれ）':''),'　'+x.reason,'　→ '+x.text])),
         ...block('■ 次に試すこと',a.improve.length?[]:[a.next]),
@@ -93,6 +95,12 @@
         '','社長へ：OK／直して／NG と、気になる点をひと言ください','※写真のアドバイスは参考。材料・味・アレルゲンは写真から判断していません。'].join('\n');
     }
     return ['【新商品審査】'+r.kind,'提案：'+(r.proposer||'未入力'),r.answers.length+'問チェック '+r.answers.filter(x=>x===true).length+'/'+r.answers.length+(r.answers.length!==QUESTION_COUNT?'（旧基準）':'')+(r.answers.includes(null)?'（未回答あり）':''),'写真チェック '+r.check.overall+(flags.length?'（'+flags.join('・')+'）':'')+(unknown?'／未判定'+unknown+'項目':''),'名前案',...r.candidates.map((c,i)=>'ABC'[i]+' '+c.name),'社長へ：OK／直して／NG と、名前A/B/Cで返信してください','写真チェックは参考です。最終判断は社長。'].join('\n');
+  }
+  // 売価（税込）と原価から原価率。どちらか欠けていれば空。税額の計算はしない
+  function costLine(r){
+    if(!r.price&&!r.cost)return '';
+    const rate=r.price&&r.cost&&Number(r.price)>0?Math.round(Number(r.cost)/Number(r.price)*1000)/10:null;
+    return [r.price?'売価 '+Number(r.price).toLocaleString('ja-JP')+'円（税込）':'売価 未入力',r.cost?'原価 '+Number(r.cost).toLocaleString('ja-JP')+'円':'原価 未入力',...(rate===null?[]:['原価率 '+rate+'%'])].join('・');
   }
   // 画面とLINE用：原則名つきで「良いところ／直すとよいところ／実物で確認」に分ける
   function adviceItems(check,views,crit){
@@ -110,6 +118,6 @@
     const visible=check.principles.filter(p=>p.mark!=='写真では判定できない'),good=visible.filter(p=>p.mark==='○').map(p=>p.reason).slice(0,3),issues=visible.filter(p=>['×','△'].includes(p.mark)).sort((a,b)=>(a.mark==='×'?0:1)-(b.mark==='×'?0:1));
     return {good:[...new Set(good)],improve:[...new Set(issues.map(p=>p.fix))].slice(0,3),next:issues[0]?.fix||'実物の焼き色・断面・形も見ながら、仕上がりを確かめてみてください。'};
   }
-  const api={KEY,MAX_HISTORY,QUESTION_COUNT,VIEWS,PHOTO_VIEWS,VIEW_NAMES,BASICS,DEFAULTS,clone,criteria,answers,qualityInput,assessment,photoAdvice,adviceItems,blank,review,basic,state,merge,shareText};
+  const api={KEY,MAX_HISTORY,QUESTION_COUNT,VIEWS,PHOTO_VIEWS,VIEW_NAMES,BASICS,DEFAULTS,clone,criteria,answers,qualityInput,assessment,photoAdvice,adviceItems,costLine,blank,review,basic,state,merge,shareText};
   root.TerrasQualityData=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
