@@ -210,7 +210,7 @@
   $('gpt-open').onclick=()=>window.TerrasGPT.open(readForm(),candidate=>{gptUndo=readForm();const next=window.TerrasGPTData.adopt(readForm(),candidate);setGPTFields(next);$('gpt-undo').hidden=false;setDirty(true);renderEditor();toast('AI案を採用しました。確認してから保存してください。');});
   $('ideas-start').onclick=async()=>{
     if(dirty&&!await confirmAction('未保存の編集があります','新しい案を採用すると、編集中の商品から新しい商品へ切り替わります。先に保存する場合は戻ってください。','新しい案を考える'))return;
-    const base=T.blank();window.TerrasGPT.open(base,candidate=>{loadEditor(window.TerrasGPTData.adopt(base,candidate),false);gptUndo=base;$('gpt-undo').hidden=false;setDirty(true);location.hash='products';toast('名前と説明文を新しい商品へ採用しました。価格などを確認して保存してください。');});
+    const base=T.blank();window.TerrasGPT.open(base,candidate=>{loadEditor(window.TerrasGPTData.adopt(base,candidate),false);gptUndo=base;$('gpt-undo').hidden=false;setDirty(true);location.hash='products';toast('名前と説明文を新しい商品へ採用しました。価格などを確認して保存してください。');},'consult');
   };
   $('gpt-undo').onclick=()=>{if(!gptUndo)return;setGPTFields(gptUndo);gptUndo=null;$('gpt-undo').hidden=true;setDirty(true);renderEditor();};
   $('naming-open').onclick=()=>{

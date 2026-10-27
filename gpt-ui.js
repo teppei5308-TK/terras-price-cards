@@ -1,11 +1,13 @@
 (function(){
   'use strict';
   const $=id=>document.getElementById(id),G=window.TerrasGPTData,P=window.TerrasPhoto,Q=window.TerrasQualityData,U=window.TerrasQualityUI;
-  let original,onAdopt,controller=null,serial=0,busy=false,allowed=false,options=[],selected=-1,hasResult=false;
-  const controls=['gpt-kind','gpt-materials','gpt-feature','pc-price','pc-cost'];
+  let original,onAdopt,controller=null,serial=0,busy=false,allowed=false,options=[],selected=-1,hasResult=false,mode='naming';
+  const controls=['gpt-kind','gpt-materials','gpt-feature','pc-name','pc-price','pc-cost'];
   function notice(text){$('gpt-status').textContent=text;}
-  function buttonLabel(){return '写真からアドバイスをもらう';}
-  function setBusy(value){busy=value;$('gpt-generate').disabled=value||!allowed||P.isLoading();controls.forEach(id=>$(id).disabled=value);$('quality-proposer').disabled=value;$('quality-questions').querySelectorAll('input').forEach(x=>x.disabled=value);P.setBusy(value);$('gpt-generate').textContent=value?'アドバイスを作成中…':buttonLabel();$('gpt-stop').hidden=!value;}
+  // 「写真から相談」は名前案を出さない（consult）。商品編集の「AIで商品名・説明文」は名前案も作る（naming）
+  const consult=()=>mode==='consult',needsAI=()=>!consult()||P.readAll().length>0;
+  function buttonLabel(){return needsAI()?'写真からアドバイスをもらう':'この内容で記録する（写真なし）';}
+  function setBusy(value){busy=value;$('gpt-generate').disabled=value||(needsAI()&&!allowed)||P.isLoading();controls.forEach(id=>$(id).disabled=value);$('quality-proposer').disabled=value;$('quality-questions').querySelectorAll('input').forEach(x=>x.disabled=value);P.setBusy(value);$('gpt-generate').textContent=value?'アドバイスを作成中…':buttonLabel();$('gpt-stop').hidden=!value;}
   function resetResults(){hasResult=false;options=[];selected=-1;$('gpt-results').replaceChildren();$('quality-result').replaceChildren();$('gpt-comparison').hidden=true;$('gpt-adopt').disabled=true;$('gpt-reviewed').checked=false;}
   function stop(){if(controller){controller.abort();controller=null;}serial++;setBusy(false);}
   async function status(){
@@ -14,9 +16,9 @@
       // AIはGT-bot（Apps Script）経由のClaude。全員合計で1日30回・30秒間隔
       const r=await fetch(window.TerrasLinePost.ENDPOINT+'?action=aiStatus',{cache:'no-store'});
       const s=await r.json();if(!s.ok)throw new Error();
-      allowed=!!s.ready&&s.remaining>0;$('gpt-generate').disabled=!allowed||busy||P.isLoading();
+      allowed=!!s.ready&&s.remaining>0;$('gpt-generate').disabled=(needsAI()&&!allowed)||busy||P.isLoading();
       notice(!s.ready?'接続設定が未完了のため、生成は停止中です。':s.remaining>0?'AI相談は全員合計で1日'+s.maxCallsPerDay+'回・30秒間隔です（今日はあと'+s.remaining+'回）。':'今日のAI相談は上限の'+s.maxCallsPerDay+'回に達しました。明日またお試しください。');
-    }catch{allowed=false;notice('AIの相談サーバーに接続できません。既存の登録・印刷は利用できます。');}
+    }catch{allowed=false;$('gpt-generate').disabled=needsAI()||busy;notice('AIの相談サーバーに接続できません。写真なしの記録・登録・印刷は利用できます。');}
   }
   function render(){
     hasResult=true;$('gpt-comparison').hidden=false;
@@ -46,15 +48,19 @@
   }
   async function generate(){
     if(busy||$('gpt-generate').disabled)return;
-    let input,context,photos;try{photos=P.readAll();input=G.input({request:'',kind:$('gpt-kind').value,materials:$('gpt-materials').value,taste:'',texture:$('gpt-feature').value,count:3},{allowAdviceOnly:photos.length>0});context=U.context(photos.map(x=>x.view));}catch(e){notice(e.message);return;}
+    let input,context,photos,name='';try{photos=P.readAll();
+      if(consult()){name=$('pc-name').value.trim();if(!name)throw new Error('商品名を入力してください。まだ決まっていなければ、先に「AIで商品名・説明文をつくる」で決めてください。');if(name.length>80)throw new Error('商品名は80文字以内です。');}
+      input=consult()?{kind:name,count:0}:G.input({request:'',kind:$('gpt-kind').value,materials:$('gpt-materials').value,taste:'',texture:$('gpt-feature').value,count:3},{allowAdviceOnly:photos.length>0});context=U.context(photos.map(x=>x.view));}catch(e){notice(e.message);return;}
+    // 写真がない相談は、AIを使わずに記録だけ作る（LINEで社長に共有できる）
+    if(consult()&&!photos.length){resetResults();options=[];render();U.showResult({candidates:[],check:Q.assessment(null,[],[],true),input,context,photos:[]});notice('記録しました。下の「LINEで送る」で社長に共有できます。');return;}
     resetResults();const token=++serial;controller=new AbortController();setBusy(true);notice('写真と入力内容からアドバイスを作っています。自動再試行はしません。');
     const timer=setTimeout(()=>controller?.abort(),90000);
     try{
       // text/plainで送る（Apps Scriptが受けられる形）
-      const r=await fetch(window.TerrasLinePost.ENDPOINT,{method:'POST',signal:controller.signal,body:JSON.stringify({action:'priceCardAI',...input,count:3,photos,quality:{mode:'advice',criteria:context.criteria},requestId:crypto.randomUUID()})});
+      const r=await fetch(window.TerrasLinePost.ENDPOINT,{method:'POST',signal:controller.signal,body:JSON.stringify({action:'priceCardAI',...(consult()?{request:'',kind:'',materials:'',taste:'',texture:''}:input),count:3,photos,quality:{mode:'advice',criteria:context.criteria},requestId:crypto.randomUUID()})});
       const result=await r.json();if(token!==serial)return;
       if(!result.ok)throw new Error(result.error||'生成に失敗しました。');
-      options=G.response({candidates:result.candidates},input.count);const check=Q.assessment(result.check,photos.map(x=>x.view),[],true);render();U.showResult({candidates:options,check,input,context,photos});
+      options=consult()?[]:G.response({candidates:result.candidates},input.count);const check=Q.assessment(result.check,photos.map(x=>x.view),[],true);render();U.showResult({candidates:options,check,input,context,photos});
       notice('相談の結果ができました。内容をご確認ください。'+(typeof result.remaining==='number'?'（今日のAI相談はあと'+result.remaining+'回）':''));
     }catch(e){if(token===serial)notice(e.name==='AbortError'?'生成を取消・時間切れにしました。サーバー側で処理中なら費用・回数は発生します。':e.message);}
     finally{clearTimeout(timer);if(token===serial){controller=null;setBusy(false);}}
@@ -69,5 +75,10 @@
   $('gpt-reviewed').onchange=()=>{$('gpt-adopt').disabled=selected<0||!$('gpt-reviewed').checked;};
   $('gpt-adopt').onclick=()=>{if(selected<0||!$('gpt-reviewed').checked)return;try{onAdopt(G.candidate(options[selected]));$('gpt-dialog').close();}catch(e){notice(e.message);}};
   P.bind(()=>{if(hasResult)resetResults();setBusy(busy);});
-  window.TerrasGPT={candidates(){return options;},open(product,adopt){stop();P.clear();U.reset();original=JSON.parse(JSON.stringify(product));onAdopt=adopt;resetResults();controls.forEach(id=>{$(id).value='';});window.TerrasQualityUI.costRate();$('gpt-generate').textContent=buttonLabel();$('gpt-dialog').showModal();$('gpt-dialog').scrollTop=0;status();}};
+  window.TerrasGPT={candidates(){return options;},open(product,adopt,openMode='naming'){mode=openMode;
+      $('gpt-naming-fields').hidden=consult();$('pc-name-label').hidden=!consult();
+      $('gpt-title').textContent=consult()?'新商品の相談':'写真からアドバイス ＋ 名前の相談';
+      $('gpt-intro').textContent=consult()?'決まった商品名と写真で、良いところと直し方を。売価・原価と一緒に社長へLINEで共有できます。':'写真から、良いところと試せる直し方を。種類・材料も入力すると名前3案を一緒に提案します。';
+      $('gpt-step2').innerHTML=consult()?'<span>2</span> 商品名・売価・原価を入力':'<span>2</span> 材料・特徴を入力 <small>名前も作る場合</small>';
+      stop();P.clear();U.reset();original=JSON.parse(JSON.stringify(product));onAdopt=adopt;resetResults();controls.forEach(id=>{$(id).value='';});window.TerrasQualityUI.costRate();$('gpt-generate').textContent=buttonLabel();$('gpt-dialog').showModal();$('gpt-dialog').scrollTop=0;status();}};
 })();

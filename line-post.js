@@ -8,8 +8,9 @@
   const MAX_PHOTOS=3,DECISIONS=['OK','直して','NG'];
   // LINEでは返事をボタンで受けるので、文面の「返信してください」の行は外す
   function lineText(text){return String(text).split('\n').filter(line=>!line.startsWith('社長へ：')).join('\n');}
-  function payload(review,text,photos){
-    return {action:'productConsult',key:KEY,payload:{id:review.id,kind:review.kind,proposer:review.proposer,text:lineText(text),candidates:review.candidates.map(c=>c.name),photos:photos.slice(0,MAX_PHOTOS).map(({view,data})=>({view,data}))}};
+  // card：商品名と売価から描いたカード画像（JPEGのデータURL）。GT-botが返事ボタンの上に載せる
+  function payload(review,text,photos,card){
+    return {action:'productConsult',key:KEY,payload:{id:review.id,kind:review.kind,proposer:review.proposer,text:lineText(text),candidates:review.candidates.map(c=>c.name),photos:photos.slice(0,MAX_PHOTOS).map(({view,data})=>({view,data})),...(card?{card}:{})}};
   }
   // LINEの「送り先を選ぶ」画面を開くリンク。本文に受付番号を入れる
   function shareUrl(review,receipt){
@@ -30,7 +31,7 @@
     return data;
   }
   // 本文はtext/plainで送る（Apps Scriptが受けられる形。ブラウザーの事前確認も起きない）
-  const post=(review,text,photos)=>call({method:'POST',body:JSON.stringify(payload(review,text,photos))});
+  const post=(review,text,photos,card)=>call({method:'POST',body:JSON.stringify(payload(review,text,photos,card))});
   const status=ids=>call({method:'GET'},'?action=pcStatus&key='+encodeURIComponent(KEY)+'&ids='+ids.map(encodeURIComponent).join(','));
   const api={ENDPOINT,MAX_PHOTOS,lineText,payload,shareUrl,reply,post,status};
   root.TerrasLinePost=api;if(typeof module!=='undefined')module.exports=api;

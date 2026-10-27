@@ -4,7 +4,7 @@
   let photos={},loading=false,locked=false,serial=0,changed=()=>{};
   function render(){
     for(const view of Q.PHOTO_VIEWS){
-      const data=photos[view],suffix=view==='top'?'':'-'+view;
+      const data=photos[view],suffix=view===Q.PHOTO_VIEWS[0]?'':'-'+view;
       $('photo-preview'+suffix).hidden=!data;
       if(data)$('photo-preview-image'+suffix).src=data;else $('photo-preview-image'+suffix).removeAttribute('src');
       $('photo-remove'+suffix).hidden=!data;$('photo-remove'+suffix).disabled=locked;
@@ -36,8 +36,8 @@
   }
   function clear(){serial++;photos={};loading=false;$('photo-status').textContent='';render();changed();}
   for(const view of Q.PHOTO_VIEWS){
-    const suffix=view==='top'?'':'-'+view;
-    if(view!=='top'){
+    const suffix=view===Q.PHOTO_VIEWS[0]?'':'-'+view;
+    if(view!==Q.PHOTO_VIEWS[0]){
       const slot=document.createElement('section');slot.className='photo-slot';
       const heading=document.createElement('h4');heading.textContent=Q.VIEW_NAMES[view]+'（任意）';slot.append(heading);
       const actions=document.createElement('div');actions.className='photo-actions';
@@ -50,6 +50,6 @@
     $('photo-camera-input'+suffix).onchange=e=>select(e,view);$('photo-library-input'+suffix).onchange=e=>select(e,view);
     $('photo-remove'+suffix).onclick=()=>{delete photos[view];render();changed();};
   }
-  window.TerrasPhoto={encode,bind(fn){changed=fn;},read(){return photos.top||null;},readAll(){return Q.PHOTO_VIEWS.filter(view=>photos[view]).map(view=>({view,data:photos[view]}));},isLoading(){return loading;},clear,setBusy(value){locked=value;render();}};
+  window.TerrasPhoto={encode,bind(fn){changed=fn;},read(){return photos[Q.PHOTO_VIEWS[0]]||null;},readAll(){return Q.PHOTO_VIEWS.filter(view=>photos[view]).map(view=>({view,data:photos[view]}));},isLoading(){return loading;},clear,setBusy(value){locked=value;render();}};
   render();
 })();

@@ -3,8 +3,9 @@
   const P=root.TerrasPhotoData||(typeof require==='function'?require('./photo-data.js'):null);
   const G=root.TerrasGPTData||(typeof require==='function'?require('./gpt-data.js'):null);
   const KEY='terras.quality.v1',MAX_HISTORY=200,QUESTION_COUNT=0;
-  const VIEWS=['top','angle','cut','tray'],VIEW_NAMES={top:'真上',angle:'斜め45°',cut:'断面',tray:'トレイに8〜10個'};
-  const PHOTO_VIEWS=['top','angle','cut'];
+  // 旧版の写真種別（真上・斜め・断面・トレイ）も履歴の互換のため残す。今の入力は商品写真1〜2枚（角度自由）＋店頭に並べた写真1枚
+  const VIEWS=['top','angle','cut','tray','item','item2','shelf'],VIEW_NAMES={top:'真上',angle:'斜め45°',cut:'断面',tray:'トレイに8〜10個',item:'商品写真1',item2:'商品写真2',shelf:'店頭に並べた写真'};
+  const PHOTO_VIEWS=['item','item2','shelf'];
   const BASICS={shokupan:{name:'365日食パン',points:'山の高さがそろう／側面が腰折れしていない／きめ・しっとり感／耳の薄さ'},croissant:{name:'クロワッサン',points:'層が外から見える／焼き色は濃い／断面がハニカム状／持つと軽い'},shiopan:{name:'塩パン',points:'巻き目がそろう／底がカリッと焼けている／塩の粒の量／バターが抜けて空洞になっていない'}};
   const DEFAULTS={questions:[],principles:[
     {no:1,title:'焼き色は攻める',rule:'濃いめのきつね色〜焦げ際。白っぽい・均一に薄いのはNG。'},
@@ -32,7 +33,7 @@
       return {mode:'advice',criteria:criteria(raw.criteria),answers:[]};
     }
     if(Object.hasOwn(raw,'mode'))throw new Error('相談モードが異なります。');
-    if(views.length&&!views.includes('top'))throw new Error('らしさチェックには真上の写真が必要です。');
+    if(views.length&&!views.some(v=>['top','item'].includes(v)))throw new Error('らしさチェックには商品の写真が必要です。');
     const c=criteria(raw.criteria,true);if(!c.questions.length)throw new Error('ページを再読み込みして写真相談を開いてください。');
     return {criteria:c,answers:answers(raw.answers,views.length>0,c.questions.length)};
   }
@@ -43,7 +44,9 @@
     const principles=raw.principles.map((p,i)=>{
       if(!object(p)||p.no!==i+1||!marks.includes(p.mark)||Object.keys(p).some(k=>!['no','mark','reason','fix'].includes(k)))throw new Error('写真チェックの原則が不正です。');
       const item={no:i+1,mark:p.mark,reason:text(p.reason,300,true),fix:text(p.fix,300,true)};
-      const missing=(i===1&&!views.includes('cut'))? '断面':([4,6].includes(i)&&!views.includes('tray'))?'トレイ':null;
+      // 断面（原則2）は断面か商品写真があれば判断を任せる。並びの原則5・7はトレイか店頭の写真があるときだけ
+      const product=views.some(v=>['cut','item','item2'].includes(v)),shelf=views.some(v=>['tray','shelf'].includes(v));
+      const missing=(i===1&&!product)?'断面':([4,6].includes(i)&&!shelf)?'トレイ':null;
       return missing==='トレイ'?{no:i+1,mark:'写真では判定できない',reason:'並べた状態の比較は写真では判定しません。',fix:'実物を並べて、形と色のリズムを確認してください。'}:missing?{no:i+1,mark:'写真では判定できない',reason:missing+'写真がありません。',fix:missing+'写真を追加してください。'}:item;
     });
     const overall=advisory?'判定なし':principles.some(p=>p.mark==='×')||staff.includes(false)?'直してから':principles.every(p=>p.mark==='写真では判定できない')?'判定なし':'社長に出せる';
