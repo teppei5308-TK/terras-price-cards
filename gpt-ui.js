@@ -2,7 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id),G=window.TerrasGPTData,P=window.TerrasPhoto,Q=window.TerrasQualityData,U=window.TerrasQualityUI;
   let original,onAdopt,controller=null,serial=0,busy=false,allowed=false,options=[],selected=-1,hasResult=false;
-  const controls=['gpt-kind','gpt-materials','pc-price','pc-cost'];
+  const controls=['gpt-kind','gpt-materials','gpt-feature','pc-price','pc-cost'];
   function notice(text){$('gpt-status').textContent=text;}
   function buttonLabel(){return '写真からアドバイスをもらう';}
   function setBusy(value){busy=value;$('gpt-generate').disabled=value||!allowed||P.isLoading();controls.forEach(id=>$(id).disabled=value);$('quality-proposer').disabled=value;$('quality-questions').querySelectorAll('input').forEach(x=>x.disabled=value);P.setBusy(value);$('gpt-generate').textContent=value?'アドバイスを作成中…':buttonLabel();$('gpt-stop').hidden=!value;}
@@ -46,7 +46,7 @@
   }
   async function generate(){
     if(busy||$('gpt-generate').disabled)return;
-    let input,context,photos;try{photos=P.readAll();input=G.input({request:'',kind:$('gpt-kind').value,materials:$('gpt-materials').value,taste:'',texture:'',count:3},{allowAdviceOnly:photos.length>0});context=U.context(photos.map(x=>x.view));}catch(e){notice(e.message);return;}
+    let input,context,photos;try{photos=P.readAll();input=G.input({request:'',kind:$('gpt-kind').value,materials:$('gpt-materials').value,taste:'',texture:$('gpt-feature').value,count:3},{allowAdviceOnly:photos.length>0});context=U.context(photos.map(x=>x.view));}catch(e){notice(e.message);return;}
     resetResults();const token=++serial;controller=new AbortController();setBusy(true);notice('写真と入力内容からアドバイスを作っています。自動再試行はしません。');
     const timer=setTimeout(()=>controller?.abort(),90000);
     try{
