@@ -4,8 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="TERRASの商品登録と実寸プライスカード印刷。ブラウザー内保存・履歴参照。">
   <title>TERRAS | プライスカード</title>
-  <link rel="stylesheet" href="styles.css?v=1.9.7">
-  <script src="archive.js" defer></script><script src="season-data.js?v=1.1.1" defer></script><script src="gpt-data.js?v=1.7.0" defer></script><script src="photo-data.js?v=1.6.0" defer></script><script src="quality-data.js?v=1.9.6" defer></script><script src="core.js?v=1.6.0" defer></script><script src="renderer.js?v=1.3.0" defer></script><script src="names.js?v=1.2.0" defer></script><script src="photo-ui.js?v=1.9.5" defer></script><script src="quality-store.js?v=1.6.0" defer></script><script src="line-post.js?v=1.9.5" defer></script><script src="quality-ui.js?v=1.9.5" defer></script><script src="gpt-ui.js?v=1.9.5" defer></script><script src="handoff.js?v=1.7.0" defer></script><script src="app.js?v=1.9.5" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.10.0">
+  <script src="archive.js" defer></script><script src="season-data.js?v=1.1.1" defer></script><script src="gpt-data.js?v=1.7.0" defer></script><script src="photo-data.js?v=1.6.0" defer></script><script src="quality-data.js?v=1.9.6" defer></script><script src="core.js?v=1.6.0" defer></script><script src="renderer.js?v=1.3.0" defer></script><script src="names.js?v=1.2.0" defer></script><script src="photo-ui.js?v=1.9.5" defer></script><script src="quality-store.js?v=1.6.0" defer></script><script src="line-post.js?v=1.10.0" defer></script><script src="card-sync.js?v=1.10.0" defer></script><script src="quality-ui.js?v=1.9.5" defer></script><script src="gpt-ui.js?v=1.9.5" defer></script><script src="handoff.js?v=1.7.0" defer></script><script src="app.js?v=1.10.0" defer></script>
 </head>
 <body>
 <div class="app-shell">
@@ -20,7 +20,7 @@
       <a href="#seasons" data-nav="seasons"><span class="nav-icon">✿</span>季節・イベント</a>
       <a href="#archive" data-nav="archive"><span class="nav-icon">◷</span>過去のカード</a>
     </nav>
-    <div class="side-bottom"><span class="local-dot"></span>このブラウザーに保存<small>この端末・ブラウザーだけのデータです。<br>定期的にJSONでバックアップしてください。</small><button id="backup-open" class="text-button">バックアップ・復元 ↗</button></div>
+    <div class="side-bottom"><span class="local-dot"></span>どのPCでも同じ商品<small id="sync-status">共有を確認中…</small><small>A4の並び・ベーシックの基準写真はこのPCだけです。</small><button id="sync-now" class="text-button">今すぐ共有をそろえる</button><button id="backup-open" class="text-button">バックアップ・復元 ↗</button></div>
   </aside>
   <main>
     <header class="topbar"><div>商品を整えて、売り場へ。</div><div class="topbar-right"><span id="storage-status">ローカル保存</span><button id="handoff-open" class="text-button">Claudeへ引き継ぐ ↗</button><button id="help-open" class="text-button">使い方</button></div></header>

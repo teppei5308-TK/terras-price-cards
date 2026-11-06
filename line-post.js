@@ -2,8 +2,9 @@
   'use strict';
   // GT-bot（Google Apps Script）経由で、決めたLINEグループ（社長が入っている）へ新商品相談を流す。
   // 日報と同じ返信方式：ここでは受付だけ→スタッフが受付番号「#P…」をLINEでグループに送る→GT-botがその投稿に返信して流す（通数ゼロ）。
+  // 2026/11/6：GT-botの会社アカウント移管（11/3）に合わせて新しいURLへ。旧URL（AKfycbxG0d…・個人アカウント）は残っているが、LINEの返信は会社側が受けるので相談がつながらない。
   // 投稿キーはGT-bot側のスクリプトプロパティ PRODUCT_POST_KEY と同じ値。画面から見える値なので、GT-bot側で1日20件・重複なしに制限している。
-  const ENDPOINT='https://script.google.com/macros/s/AKfycbxG0dfLIkD4fiRS3flTMpszF6c-LmHOJdo-WwKdOnYBHK3Xd1u5UKJq-QMa3i1TiBSZEA/exec';
+  const ENDPOINT='https://script.google.com/macros/s/AKfycbwC9Mbomsh1GBr7nl32N74gAfX-CMfK9jTCNCcFzGJswnxZWW0WhpiLjrv3BHEYNH-u9w/exec';
   const KEY='tpc_0E3YXQfaGHwq425pgs_CCFcHfW3DkwLN';
   const MAX_PHOTOS=3,DECISIONS=['OK','直して','NG'];
   // LINEでは返事をボタンで受けるので、文面の「返信してください」の行は外す
@@ -33,6 +34,6 @@
   // 本文はtext/plainで送る（Apps Scriptが受けられる形。ブラウザーの事前確認も起きない）
   const post=(review,text,photos,card)=>call({method:'POST',body:JSON.stringify(payload(review,text,photos,card))});
   const status=ids=>call({method:'GET'},'?action=pcStatus&key='+encodeURIComponent(KEY)+'&ids='+ids.map(encodeURIComponent).join(','));
-  const api={ENDPOINT,MAX_PHOTOS,lineText,payload,shareUrl,reply,post,status};
+  const api={ENDPOINT,KEY,MAX_PHOTOS,lineText,payload,shareUrl,reply,post,status};
   root.TerrasLinePost=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -20,3 +20,5 @@ a.line-open{display:inline-block;background:#06c755;color:#fff;border:1px solid 
 .advice-cost{font-size:13px;font-weight:600;color:var(--olive);margin:0 0 12px}#pc-cost-rate{font-weight:600;color:var(--olive);margin-top:-8px}#pc-cost-rate:empty{display:none}
 .gpt-feature-label{grid-column:1/-1}
 .consult-card{margin:0 0 12px;max-width:340px}.consult-card img{width:100%;border-radius:4px;display:block}.consult-card figcaption{font-size:10px;color:var(--muted);margin-top:4px}
+
+.side-bottom .text-button{display:block;margin-top:4px}.side-bottom small.sync-error{color:#a46146}

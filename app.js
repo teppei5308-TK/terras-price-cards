@@ -24,14 +24,20 @@
     try {localStorage.setItem(T.STORAGE_KEY,T.serialize(products,selection,settings));$('storage-status').textContent='このブラウザーに保存済み';return true;}
     catch {storageBlocked=true;$('storage-status').textContent='保存不可：JSONでバックアップ';toast('ブラウザーに保存できません。データを失わないようJSONを書き出してください。');return false;}
   }
+  // v1.10.0より前に自動で入った見本（手つかずのハーフバゲット）は、共有に送らないよう見本の印を付ける
+  const SAMPLE_NOTE='ユーザー確認：税抜190円。大きなパンのカット半分ではなく、小さく個別に焼成。税込価格・アレルゲンは未確認。';
+  function markSample(p){
+    const untouched=p&&!p.sample&&p.name==='ハーフバゲット'&&p.description==='小さく一つずつ焼き上げたバゲットです。'&&p.beforeTax==='190'&&!p.includingTax&&p.allergyStatus==='unknown'&&p.provenance?.note===SAMPLE_NOTE;
+    return untouched?{...p,sample:true}:p;
+  }
   function load() {
     let raw;
     try {raw=localStorage.getItem(T.STORAGE_KEY);} catch {storageBlocked=true;}
     if (raw) {
-      try {const data=T.parseBackup(raw);products=data.products;selection=data.selection;settings=data.settings;}
+      try {const data=T.parseBackup(raw);products=data.products.map(markSample);selection=data.selection;settings=data.settings;}
       catch {storageBlocked=true;$('storage-status').textContent='保存データの読み取りエラー';toast('保存データの形式が異なります。元データを上書きせず停止しました。');}
     } else if (!storageBlocked) {
-      const p={...T.blank(),name:'ハーフバゲット',description:'小さく一つずつ焼き上げたバゲットです。',beforeTax:'190',provenance:{type:'user_instruction',note:'ユーザー確認：税抜190円。大きなパンのカット半分ではなく、小さく個別に焼成。税込価格・アレルゲンは未確認。'}};
+      const p={...T.blank(),name:'ハーフバゲット',description:'小さく一つずつ焼き上げたバゲットです。',beforeTax:'190',provenance:{type:'user_instruction',note:'ユーザー確認：税抜190円。大きなパンのカット半分ではなく、小さく個別に焼成。税込価格・アレルゲンは未確認。'},sample:true};
       products=[p];selection=[p.id];persist();
     }
     if (storageBlocked) $('storage-status').textContent='保存不可：JSONでバックアップ';
@@ -108,11 +114,11 @@
     const p=readForm(),errors=T.validate(p);
     $('form-errors').innerHTML=errors.length?'<div class="error">'+errors.map(escape).join('<br>')+'</div>':'';
     if(errors.length){$('form-errors').scrollIntoView({block:'nearest'});return false;}
-    p.name=p.name.trim();p.updatedAt=new Date().toISOString();
+    p.name=p.name.trim();p.updatedAt=new Date().toISOString();delete p.sample;
     const i=products.findIndex(x=>x.id===p.id); if(i<0) products.push(p); else products[i]=p;
     draft=p;loadedId=p.id;setDirty(false);$('editor-heading').textContent='商品を編集';$('delete-product').disabled=false;$('duplicate-product').disabled=false;
     namingUndo=null;$('naming-undo').hidden=true;gptUndo=null;$('gpt-undo').hidden=true;
-    const ok=persist();renderProducts();if(add) addSelection(p.id);else toast(ok?'商品を保存しました。':'この画面に保持しました。JSONバックアップが必要です。');renderPrint();return true;
+    const ok=persist();renderProducts();if(add) addSelection(p.id);else toast(ok?'商品を保存しました。':'この画面に保持しました。JSONバックアップが必要です。');renderPrint();sync.run();return true;
   }
   function addSelection(id) {
     if(selection.length>=6){toast('A4に並べられるカードは6枚までです。');return;}
@@ -250,7 +256,7 @@
     if(!loadedId)return;
     const id=loadedId,p=products.find(x=>x.id===id);
     if(!await confirmAction('商品を削除','「'+p.name+'」を登録商品と印刷選択から外します。必要な場合は先にJSONでバックアップしてください。','削除する'))return;
-    products=products.filter(x=>x.id!==id);selection=selection.filter(x=>x!==id);persist();loadEditor(products[0]||T.blank(),!!products.length);renderPrint();toast('商品を削除しました。');
+    products=products.filter(x=>x.id!==id);selection=selection.filter(x=>x!==id);sync.markDeleted(id);persist();sync.run();loadEditor(products[0]||T.blank(),!!products.length);renderPrint();toast('商品を削除しました。');
   };
   $('product-search').oninput=renderProducts;
   $('product-list').onclick=e=>{const open=e.target.closest('[data-open]'),add=e.target.closest('[data-add]');if(open)switchEditor(products.find(p=>p.id===open.dataset.open),true);if(add)addSelection(add.dataset.add);};
@@ -301,7 +307,7 @@
     try{const blob=new Blob([fullBackup()],{type:'application/json;charset=utf-8'});const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download='TERRAS-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);$('import-result').textContent='JSONを書き出しました。商品・チェック履歴・基準写真が含まれます。ダウンロード先をご確認ください。';}catch(e){$('import-result').textContent=e.message;}
   };
   function importJSON(text) {
-    try {const data=T.parseBackup(text);const merged=T.mergeBackup(products,data.products);if(data.quality){window.TerrasQualityStore.importState(data.quality);window.TerrasQualityUI.refresh();}products=merged.products;if(!selection.length){selection=data.selection.slice();settings=data.settings;}persist();renderProducts();renderPrint();$('import-result').textContent=merged.count+'件を追加しました。既存の商品を保持しています。'+(data.quality?' チェック基準・基準写真を復元し、履歴は重複なく追加しました。':'');}
+    try {const data=T.parseBackup(text);const merged=T.mergeBackup(products,data.products);if(data.quality){window.TerrasQualityStore.importState(data.quality);window.TerrasQualityUI.refresh();}products=merged.products;if(!selection.length){selection=data.selection.slice();settings=data.settings;}persist();renderProducts();renderPrint();sync.run();$('import-result').textContent=merged.count+'件を追加しました。既存の商品を保持しています（共有にも送ります）。'+(data.quality?' チェック基準・基準写真を復元し、履歴は重複なく追加しました。':'');}
     catch(err){$('import-result').textContent=err.message;}
   }
   $('import-text-button').onclick=()=>importJSON($('import-text').value);
@@ -323,6 +329,22 @@
   window.addEventListener('hashchange',route);
   window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
   window.addEventListener('storage',e=>{if(e.key===T.STORAGE_KEY)toast('別のタブでデータが変更されました。この画面をバックアップしてから再読み込みしてください。');});
-  load();loadEditor(products[0]||T.blank(),!!products.length);renderPrint();route();
+  // 共有（v1.10.0）：どのPCでも同じ商品。GT-botの「プライスカード共有」とそろえる。A4の並びはPCごと
+  function syncStatus(s){
+    const el=$('sync-status');if(!el)return;
+    if(s.state==='syncing'){el.textContent='共有を確認中…';return;}
+    if(s.state==='ok'){el.textContent='共有済み '+s.at.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});el.classList.remove('sync-error');return;}
+    el.textContent=s.message;el.classList.add('sync-error');
+  }
+  function syncResult(next){
+    const before=JSON.stringify(products);products=next;
+    if(JSON.stringify(products)===before)return;
+    selection=selection.filter(id=>products.some(p=>p.id===id));persist();renderProducts();renderPrint();
+    if(loadedId&&!dirty){const p=products.find(x=>x.id===loadedId);if(!p)loadEditor(products[0]||T.blank(),!!products.length);else if(JSON.stringify(p)!==JSON.stringify(draft))loadEditor(p,true);}
+  }
+  const sync=window.TerrasCardSync.create({getProducts:()=>products,onResult:syncResult,onStatus:syncStatus});
+  $('sync-now').onclick=()=>sync.run();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync.maybe();});
+  load();loadEditor(products[0]||T.blank(),!!products.length);renderPrint();route();if(!storageBlocked)sync.run();
   document.fonts?.ready.then(()=>{renderEditor();if(location.hash==='#print')renderPrint();});
 })();
