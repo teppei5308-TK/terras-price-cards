@@ -43,7 +43,7 @@
       const actions=document.createElement('div');actions.className='photo-actions';
       for(const [kind,label] of [['camera','撮る'],['library','選ぶ'],['remove','外す']]){const button=document.createElement('button');button.type='button';button.id='photo-'+kind+suffix;button.textContent=label;button.setAttribute('aria-label',Q.VIEW_NAMES[view]+'の写真を'+label);actions.append(button);}
       slot.append(actions);
-      for(const kind of ['camera','library']){const input=document.createElement('input');input.type='file';input.id='photo-'+kind+'-input'+suffix;input.accept='image/jpeg,image/png,image/webp,image/heic,image/heif';input.hidden=true;if(kind==='camera')input.setAttribute('capture','environment');slot.append(input);}
+      for(const kind of ['camera','library']){const input=document.createElement('input');input.type='file';input.id='photo-'+kind+'-input'+suffix;input.accept='image/*';input.hidden=true;if(kind==='camera')input.setAttribute('capture','environment');slot.append(input);}
       const figure=document.createElement('figure');figure.id='photo-preview'+suffix;figure.hidden=true;const image=document.createElement('img');image.id='photo-preview-image'+suffix;image.alt=Q.VIEW_NAMES[view]+'の写真';figure.append(image);slot.append(figure);$('photo-extras').append(slot);
     }
     $('photo-camera'+suffix).onclick=()=>$('photo-camera-input'+suffix).click();$('photo-library'+suffix).onclick=()=>$('photo-library-input'+suffix).click();
