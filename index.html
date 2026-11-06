@@ -4,8 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="TERRASの商品登録と実寸プライスカード印刷。ブラウザー内保存・履歴参照。">
   <title>TERRAS | プライスカード</title>
-  <link rel="stylesheet" href="styles.css?v=1.10.0">
-  <script src="archive.js" defer></script><script src="season-data.js?v=1.1.1" defer></script><script src="gpt-data.js?v=1.7.0" defer></script><script src="photo-data.js?v=1.6.0" defer></script><script src="quality-data.js?v=1.9.6" defer></script><script src="core.js?v=1.6.0" defer></script><script src="renderer.js?v=1.3.0" defer></script><script src="names.js?v=1.2.0" defer></script><script src="photo-ui.js?v=1.10.1" defer></script><script src="quality-store.js?v=1.6.0" defer></script><script src="line-post.js?v=1.10.0" defer></script><script src="card-sync.js?v=1.10.0" defer></script><script src="quality-ui.js?v=1.9.5" defer></script><script src="gpt-ui.js?v=1.9.5" defer></script><script src="handoff.js?v=1.7.0" defer></script><script src="app.js?v=1.10.0" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.11.0">
+  <script src="archive.js" defer></script><script src="season-data.js?v=1.1.1" defer></script><script src="gpt-data.js?v=1.7.0" defer></script><script src="photo-data.js?v=1.6.0" defer></script><script src="quality-data.js?v=1.9.6" defer></script><script src="core.js?v=1.6.0" defer></script><script src="renderer.js?v=1.3.0" defer></script><script src="names.js?v=1.2.0" defer></script><script src="photo-ui.js?v=1.10.1" defer></script><script src="quality-store.js?v=1.6.0" defer></script><script src="line-post.js?v=1.10.0" defer></script><script src="card-sync.js?v=1.10.0" defer></script><script src="quality-ui.js?v=1.9.5" defer></script><script src="gpt-ui.js?v=1.9.5" defer></script><script src="handoff.js?v=1.7.0" defer></script><script src="dup-check.js?v=1.11.0" defer></script><script src="app.js?v=1.11.0" defer></script>
 </head>
 <body>
 <div class="app-shell">
@@ -39,10 +39,10 @@
     <section id="view-products" class="view">
       <div class="page-heading"><div><p class="eyebrow">PRODUCTS</p><h1>プライスカードを作る</h1><p>いつもの商品も、新しいひと品も。登録して、すぐにカードへ。</p></div><button id="new-product" class="primary">＋ 新しい商品</button></div>
       <div class="workspace">
-        <section class="product-panel panel" aria-label="登録商品一覧"><div class="panel-head"><h2>登録した商品</h2><span id="list-total" class="subtle"></span></div><label class="search-wrap"><span>⌕</span><input id="product-search" type="search" placeholder="商品名・説明で検索" aria-label="登録商品を検索"></label><div id="product-list"></div><div class="list-footer">過去のカードからも登録できます。<a href="#archive">履歴を見る →</a></div></section>
+        <section class="product-panel panel" aria-label="登録商品一覧"><div class="panel-head"><h2>登録した商品</h2><span id="list-total" class="subtle"></span></div><label class="search-wrap"><span>⌕</span><input id="product-search" type="search" placeholder="商品名・説明で検索" aria-label="登録商品を検索"></label><button id="dup-toggle" type="button" class="dup-toggle" hidden></button><div id="product-list"></div><div class="list-footer">過去のカードからも登録できます。<a href="#archive">履歴を見る →</a></div></section>
         <section class="editor-panel panel"><div class="panel-head"><h2 id="editor-heading">新しい商品</h2><span id="dirty-label" class="pill">未保存</span></div>
           <form id="product-form" novalidate>
-            <label>商品名 <span class="required">必須</span><input id="name" name="name" placeholder="例：ハーフバゲット" autocomplete="off"></label>
+            <label>商品名 <span class="required">必須</span><input id="name" name="name" placeholder="例：ハーフバゲット" autocomplete="off"></label><div id="name-dup" class="name-dup" role="status" hidden></div>
             <div class="naming-tools"><button type="button" id="gpt-open">✦ AIで商品名・説明文をつくる</button><button type="button" id="gpt-undo" hidden>AI案の採用を取り消す</button><button type="button" id="naming-open">✧ パンの名前を考える</button><button type="button" id="naming-undo" hidden>採用を取り消す</button></div>
             <label>商品の説明<textarea id="description" name="description" rows="3" placeholder="素材やおいしさ、伝えたいことを。改行も使えます。"></textarea></label>
             <div class="field-pair"><label>税抜価格（円）<input id="beforeTax" name="beforeTax" inputmode="decimal" placeholder="190"></label><label>税込価格（円）<input id="includingTax" name="includingTax" inputmode="decimal" placeholder="確認した金額のみ"></label></div>

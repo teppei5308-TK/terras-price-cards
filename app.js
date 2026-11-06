@@ -7,6 +7,7 @@
   let products = [], selection = [], settings = {scale:1,cutMarks:true};
   let draft, dirty=false, loadedId=null, storageBlocked=false, archiveLimit=24, toastTimer, printing=false;
   let confirmResolve;
+  const DC = window.TerrasDupCheck; let dupOnly=false;
   let seasonGroup='ハロウィン', seasonLimit=24, historyCard=null, historyGroup=null;
   let namingIteration=0, namingOptions=[], namingUndo=null, gptUndo=null;
   function confirmAction(title, message, yes='続ける') {
@@ -63,7 +64,7 @@
     f.elements.events.value=(p.events||[]).join('、');
     f.querySelectorAll('[name="allergen"]').forEach(x=>{x.checked=p.allergens.includes(x.value);});
     $('editor-heading').textContent=saved?'商品を編集':'新しい商品';$('provenance-panel').innerHTML=provenanceHTML(p.provenance);
-    $('delete-product').disabled=!saved;$('duplicate-product').disabled=!saved;$('form-errors').innerHTML='';setDirty(false);renderEditor();renderProducts();
+    $('delete-product').disabled=!saved;$('duplicate-product').disabled=!saved;$('form-errors').innerHTML='';setDirty(false);renderEditor();renderProducts();renderDupHint();
   }
   async function switchEditor(p,saved) {
     if(dirty && !await confirmAction('未保存の変更があります','別の商品を開くと、保存していない変更は失われます。','変更を破棄して開く')) return;
@@ -71,9 +72,14 @@
   }
   function renderProducts() {
     const q=$('product-search').value.normalize('NFKC').toLowerCase();
-    const matches=products.filter(p=>(p.name+' '+p.description+' '+(p.events||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));
+    const dupGroups=DC.groups(products);if(!dupGroups.length)dupOnly=false;
+    const dupIds=new Set(dupGroups.flat().map(p=>p.id));
+    $('dup-toggle').hidden=!dupGroups.length;$('dup-toggle').classList.toggle('on',dupOnly);
+    $('dup-toggle').textContent=dupOnly?'似た名前の確認を終える（すべての商品に戻る）':'⚠ 似た名前の商品が '+dupGroups.length+' 組あります。確かめる →';
+    const hit=p=>(p.name+' '+p.description+' '+(p.events||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q);
+    const matches=dupOnly?dupGroups.flatMap((g,gi)=>g.filter(hit).map((p,i)=>({...p,_dupHead:i===0?'似た名前 '+(gi+1)+'（'+g.length+'件）　古い方を開いて削除するか、名前を直してください':''}))):products.filter(hit);
     $('product-count').textContent=products.length;$('list-total').textContent=products.length+' 件';
-    $('product-list').innerHTML=matches.length?matches.map(p=>'<div class="product-row '+(p.id===loadedId?'active':'')+'"><button class="product-open" data-open="'+escape(p.id)+'"><strong>'+escape(p.name)+'</strong><small>'+escape(p.beforeTax?'¥'+p.beforeTax+' 税抜':'¥'+p.includingTax+' 税込')+' · '+(p.allergyStatus==='unknown'?'アレルゲン未確認':'表示内容入力済み')+'</small></button><button class="mini-add" data-add="'+escape(p.id)+'" aria-label="'+escape(p.name)+'をA4に追加">＋</button></div>').join(''):'<div class="empty-state">'+(q?'一致する商品がありません。':'まだ商品がありません。<br>新しい商品を登録しましょう。')+'</div>';
+    $('product-list').innerHTML=matches.length?matches.map(p=>(p._dupHead?'<div class="dup-group-head">'+escape(p._dupHead)+'</div>':'')+'<div class="product-row '+(p.id===loadedId?'active':'')+'"><button class="product-open" data-open="'+escape(p.id)+'"><strong>'+escape(p.name)+'</strong><small>'+escape(p.beforeTax?'¥'+p.beforeTax+' 税抜':'¥'+p.includingTax+' 税込')+' · '+(dupIds.has(p.id)&&!dupOnly?'似た名前あり · ':'')+(dupOnly&&p.updatedAt?'更新 '+escape(new Date(p.updatedAt).toLocaleDateString('ja-JP'))+' · ':'')+(p.allergyStatus==='unknown'?'アレルゲン未確認':'表示内容入力済み')+'</small></button><button class="mini-add" data-add="'+escape(p.id)+'" aria-label="'+escape(p.name)+'をA4に追加">＋</button></div>').join(''):'<div class="empty-state">'+(q?'一致する商品がありません。':'まだ商品がありません。<br>新しい商品を登録しましょう。')+'</div>';
     $('print-product-select').innerHTML=products.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.name)+'</option>').join('');
     $('add-print-product').disabled=!products.length;
     $('event-suggestions').innerHTML=allSeasonGroups().map(g=>'<option value="'+escape(g.label)+'"></option>').join('');
@@ -110,10 +116,17 @@
     $('allergen-options').querySelectorAll('input').forEach(x=>{x.disabled=unknown;});$('allergyOther').disabled=unknown;
     requestAnimationFrame(()=>{$('preview-warnings').innerHTML=warningsHTML(p,overflow($('editor-preview').querySelector('.price-card')));});
   }
-  function saveProduct(add=false) {
+  function renderDupHint() {
+    const box=$('name-dup'),name=$('product-form').elements.name.value,hits=DC.findSimilar(name,products,draft?.id).slice(0,5);
+    box.hidden=!hits.length;if(!hits.length){box.innerHTML='';return;}
+    box.innerHTML=(hits.some(h=>h.kind==='same')?'同じ名前の商品がすでにあります。':'似た名前の商品があります。')+'同じものなら、そちらを開いて直してください。<br>'+hits.map(h=>'<button type="button" data-dup-open="'+escape(h.product.id)+'">'+escape(h.product.name)+'（'+escape(h.product.beforeTax?'¥'+h.product.beforeTax+' 税抜':'¥'+h.product.includingTax+' 税込')+'）を開く</button>').join('');
+  }
+  async function saveProduct(add=false) {
     const p=readForm(),errors=T.validate(p);
     $('form-errors').innerHTML=errors.length?'<div class="error">'+errors.map(escape).join('<br>')+'</div>':'';
     if(errors.length){$('form-errors').scrollIntoView({block:'nearest'});return false;}
+    const isNew=!products.some(x=>x.id===p.id),hits=isNew?DC.findSimilar(p.name,products,p.id):[];
+    if(hits.length&&!await confirmAction(hits.some(h=>h.kind==='same')?'同じ名前の商品があります':'似た名前の商品があります','登録済み：'+hits.slice(0,5).map(h=>h.product.name).join('、')+(hits.length>5?' ほか':'')+'。同じ商品なら「戻る」を押して、名前の下のボタンから登録済みの商品を開いてください。','別の商品として保存'))return false;
     p.name=p.name.trim();p.updatedAt=new Date().toISOString();delete p.sample;
     const i=products.findIndex(x=>x.id===p.id); if(i<0) products.push(p); else products[i]=p;
     draft=p;loadedId=p.id;setDirty(false);$('editor-heading').textContent='商品を編集';$('delete-product').disabled=false;$('duplicate-product').disabled=false;
@@ -246,10 +259,12 @@
   $('season-history').onclick=e=>{const b=e.target.closest('[data-season-open]');if(b)openHistory(b.dataset.seasonOpen,seasonGroup);};
   $('history-source-select').onchange=renderHistoryPreview;
   $('history-copy').onclick=()=>{if(!historyCard)return;const p=T.fromArchive(historyCard);p.events=historyGroup?[historyGroup]:T.eventsForArchive(historyCard,S.groups);$('history-dialog').close();switchEditor(p,false);};
-  $('product-form').addEventListener('input',()=>{setDirty(true);renderEditor();});
+  $('product-form').addEventListener('input',e=>{setDirty(true);renderEditor();if(e.target.name==='name')renderDupHint();});
+  $('name-dup').onclick=e=>{const b=e.target.closest('[data-dup-open]');if(b)switchEditor(products.find(p=>p.id===b.dataset.dupOpen),true);};
+  $('dup-toggle').onclick=()=>{dupOnly=!dupOnly;renderProducts();};
   $('product-form').addEventListener('change',()=>{setDirty(true);renderEditor();});
   $('product-form').addEventListener('submit',e=>{e.preventDefault();saveProduct();});
-  $('save-select').onclick=()=>{if(saveProduct(true))location.hash='print';};
+  $('save-select').onclick=async()=>{if(await saveProduct(true))location.hash='print';};
   $('new-product').onclick=()=>switchEditor(T.blank(),false);
   $('duplicate-product').onclick=()=>{if(loadedId){const p=T.copy(readForm());switchEditor(p,false);}};
   $('delete-product').onclick=async()=>{
