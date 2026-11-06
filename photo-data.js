@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const maxBytes=150000,maxSide=512,maxSourceBytes=10*1024*1024,maxRequestBytes=206000,maxMultiRequestBytes=830000;
+  const maxBytes=150000,maxSide=512,maxSourceBytes=40*1024*1024,maxRequestBytes=206000,maxMultiRequestBytes=830000;
   function sanitize(url){
     const prefix='data:image/jpeg;base64,';
     if(typeof url!=='string'||!url.startsWith(prefix)||url.length>prefix.length+Math.ceil(maxBytes/3)*4)throw new Error('写真は縮小済みのJPEGにしてください。');
