@@ -75,11 +75,11 @@
     const dupGroups=DC.groups(products);if(!dupGroups.length)dupOnly=false;
     const dupIds=new Set(dupGroups.flat().map(p=>p.id));
     $('dup-toggle').hidden=!dupGroups.length;$('dup-toggle').classList.toggle('on',dupOnly);
-    $('dup-toggle').textContent=dupOnly?'似た名前の確認を終える（すべての商品に戻る）':'⚠ 似た名前の商品が '+dupGroups.length+' 組あります。確かめる →';
+    $('dup-toggle').textContent=dupOnly?'確認を終える（すべての商品に戻る）':'⚠ 同じ名前（表記違いを含む）の商品が '+dupGroups.length+' 組あります。確かめる →';
     const hit=p=>(p.name+' '+p.description+' '+(p.events||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q);
-    const matches=dupOnly?dupGroups.flatMap((g,gi)=>g.filter(hit).map((p,i)=>({...p,_dupHead:i===0?'似た名前 '+(gi+1)+'（'+g.length+'件）　古い方を開いて削除するか、名前を直してください':''}))):products.filter(hit);
+    const matches=dupOnly?dupGroups.flatMap((g,gi)=>g.filter(hit).map((p,i)=>({...p,_dupHead:i===0?'同じ名前 '+(gi+1)+'（'+g.length+'件）　古い方を開いて削除するか、名前を直してください':''}))):products.filter(hit);
     $('product-count').textContent=products.length;$('list-total').textContent=products.length+' 件';
-    $('product-list').innerHTML=matches.length?matches.map(p=>(p._dupHead?'<div class="dup-group-head">'+escape(p._dupHead)+'</div>':'')+'<div class="product-row '+(p.id===loadedId?'active':'')+'"><button class="product-open" data-open="'+escape(p.id)+'"><strong>'+escape(p.name)+'</strong><small>'+escape(p.beforeTax?'¥'+p.beforeTax+' 税抜':'¥'+p.includingTax+' 税込')+' · '+(dupIds.has(p.id)&&!dupOnly?'似た名前あり · ':'')+(dupOnly&&p.updatedAt?'更新 '+escape(new Date(p.updatedAt).toLocaleDateString('ja-JP'))+' · ':'')+(p.allergyStatus==='unknown'?'アレルゲン未確認':'表示内容入力済み')+'</small></button><button class="mini-add" data-add="'+escape(p.id)+'" aria-label="'+escape(p.name)+'をA4に追加">＋</button></div>').join(''):'<div class="empty-state">'+(q?'一致する商品がありません。':'まだ商品がありません。<br>新しい商品を登録しましょう。')+'</div>';
+    $('product-list').innerHTML=matches.length?matches.map(p=>(p._dupHead?'<div class="dup-group-head">'+escape(p._dupHead)+'</div>':'')+'<div class="product-row '+(p.id===loadedId?'active':'')+'"><button class="product-open" data-open="'+escape(p.id)+'"><strong>'+escape(p.name)+'</strong><small>'+escape(p.beforeTax?'¥'+p.beforeTax+' 税抜':'¥'+p.includingTax+' 税込')+' · '+(dupIds.has(p.id)&&!dupOnly?'同じ名前あり · ':'')+(dupOnly&&p.updatedAt?'更新 '+escape(new Date(p.updatedAt).toLocaleDateString('ja-JP'))+' · ':'')+(p.allergyStatus==='unknown'?'アレルゲン未確認':'表示内容入力済み')+'</small></button><button class="mini-add" data-add="'+escape(p.id)+'" aria-label="'+escape(p.name)+'をA4に追加">＋</button></div>').join(''):'<div class="empty-state">'+(q?'一致する商品がありません。':'まだ商品がありません。<br>新しい商品を登録しましょう。')+'</div>';
     $('print-product-select').innerHTML=products.map(p=>'<option value="'+escape(p.id)+'">'+escape(p.name)+'</option>').join('');
     $('add-print-product').disabled=!products.length;
     $('event-suggestions').innerHTML=allSeasonGroups().map(g=>'<option value="'+escape(g.label)+'"></option>').join('');
@@ -119,14 +119,15 @@
   function renderDupHint() {
     const box=$('name-dup'),name=$('product-form').elements.name.value,hits=DC.findSimilar(name,products,draft?.id).slice(0,5);
     box.hidden=!hits.length;if(!hits.length){box.innerHTML='';return;}
-    box.innerHTML=(hits.some(h=>h.kind==='same')?'同じ名前の商品がすでにあります。':'似た名前の商品があります。')+'同じものなら、そちらを開いて直してください。<br>'+hits.map(h=>'<button type="button" data-dup-open="'+escape(h.product.id)+'">'+escape(h.product.name)+'（'+escape(h.product.beforeTax?'¥'+h.product.beforeTax+' 税抜':'¥'+h.product.includingTax+' 税込')+'）を開く</button>').join('');
+    const sure=hits.some(h=>DC.strong(h.kind));box.classList.toggle('soft',!sure);
+    box.innerHTML=(sure?'同じ名前（表記違いを含む）の商品がすでにあります。同じものなら、そちらを開いて直してください。':'似た名前の商品があります。味違い・サイズ違いなら、そのまま保存して大丈夫です。')+'<br>'+hits.map(h=>'<button type="button" data-dup-open="'+escape(h.product.id)+'">'+escape(h.product.name)+'（'+escape(h.product.beforeTax?'¥'+h.product.beforeTax+' 税抜':'¥'+h.product.includingTax+' 税込')+'）を開く</button>').join('');
   }
   async function saveProduct(add=false) {
     const p=readForm(),errors=T.validate(p);
     $('form-errors').innerHTML=errors.length?'<div class="error">'+errors.map(escape).join('<br>')+'</div>':'';
     if(errors.length){$('form-errors').scrollIntoView({block:'nearest'});return false;}
-    const isNew=!products.some(x=>x.id===p.id),hits=isNew?DC.findSimilar(p.name,products,p.id):[];
-    if(hits.length&&!await confirmAction(hits.some(h=>h.kind==='same')?'同じ名前の商品があります':'似た名前の商品があります','登録済み：'+hits.slice(0,5).map(h=>h.product.name).join('、')+(hits.length>5?' ほか':'')+'。同じ商品なら「戻る」を押して、名前の下のボタンから登録済みの商品を開いてください。','別の商品として保存'))return false;
+    const isNew=!products.some(x=>x.id===p.id),hits=isNew?DC.findSimilar(p.name,products,p.id).filter(h=>DC.strong(h.kind)):[];
+    if(hits.length&&!await confirmAction('同じ名前の商品があります','登録済み：'+hits.slice(0,5).map(h=>h.product.name).join('、')+(hits.length>5?' ほか':'')+'。同じ商品なら「戻る」を押して、名前の下のボタンから登録済みの商品を開いてください。','別の商品として保存'))return false;
     p.name=p.name.trim();p.updatedAt=new Date().toISOString();delete p.sample;
     const i=products.findIndex(x=>x.id===p.id); if(i<0) products.push(p); else products[i]=p;
     draft=p;loadedId=p.id;setDirty(false);$('editor-heading').textContent='商品を編集';$('delete-product').disabled=false;$('duplicate-product').disabled=false;
